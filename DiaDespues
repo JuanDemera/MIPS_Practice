@@ -1,0 +1,214 @@
+#El dia Despues.
+.data
+buffer: .space 12
+msg1: .asciiz "~~~~~~~~~~~~~~~~~~~El Dia Despues~~~~~~~~~~~~~~~~~~~\n"
+msg2: .asciiz "Selecione un numero\n0 ->Generar fecha Aleatoria\n1 ->Ingresar fecha\n>"
+msg3: .asciiz "->Ingrese el Dia en el sigueinte Formato dd/mm/aaaa\n>" 
+msg4: .asciiz ">fecha inicial: "
+msg5: .asciiz "/"
+msg6: .asciiz "\n>fecha final: " 
+
+.text
+
+
+main:	li $v0,4 #salida a consola Titulo
+	la $a0,msg1
+	syscall
+	
+	li $v0,4 #salida a consola opciones
+	la $a0,msg2
+	syscall
+	
+	li $v0,5 #pedir la opcion al usuario
+	syscall
+	
+	la $s5,msg4 #reservado para mensajes de fecha
+	
+	beq $v0,0,fechaAleatorio	
+	beq $v0,1,fechaManual	
+	
+fechaAleatorio:	
+		li $a1,100
+		jal numAleatorio
+		addi $s0,$v0,2000 #anio
+ 	
+ 		li $a1,11
+ 		jal numAleatorio
+ 		addi $s1,$v0,1 #mes
+ 		
+ 		add $a0,$s0,$0
+ 		jal is_leap_year#is leap
+ 		
+ 		add $a0,$v0,$0
+ 		add $a1,$s1,$0
+ 		jal diasDelMes    
+ 		add $s3,$v0,$0  #dias del mes
+ 		
+ 		addi $a1,$s3,-1
+ 		jal numAleatorio
+ 		addi $s2,$v0,1 #dia
+ 		
+ 		add $a0,$s2,$0#dia el unico q se modificara en showdate
+ 		add $a1,$s1,$0#mes
+ 		add $a2,$s0,$0#anio
+ 		jal showDate
+		 	
+		add $a3,$s2,$0 #renovar dia
+		add $a0,$s3,$0	# renovar numero de dias
+		jal despues
+		j exit
+fechaManual:	
+		#opcion no terminada
+		li $s0,0 #dia
+		li $s1,0 #mes
+		li $s2,0 #anio
+				 
+		li $v0,4 #salida a consola pedir fecha
+		la $a0,msg3
+		syscall
+		
+		li $v0,8
+		la $a0,buffer
+		li $a1,12
+		add $t0,$a0,$0 #puntero
+		syscall
+
+    		#la $a0, buffer  # reload byte space to primary address
+    		
+    	
+ 		lbu $t2,0($a0)
+		#beq $t2,$zero,nulo
+		
+		li $v0 , 4
+		#add $a0,$t2,$0
+		syscall 		
+		  		
+		
+		j exit
+despues:
+	#$a3 dia / $a1 mes / $a2 anio $ao numdias
+	la $s5,msg6
+	addi $sp,$sp,-4 #reservar el $ra
+	sw $ra,0($sp)
+	
+	beq $a3,$a0,mes
+	addi $a0,$a3,1  #dia el unico q se modificara en showdate  
+	add $a2,$a2,$0 
+ 	jal showDate
+ 	j endD
+ 	
+mes:	li $t0,12
+	beq $a1,$t0,anio
+	li $a0,1  #dia el unico q se modificara en showdate
+	addi $a1,$a1,1  
+ 	jal showDate
+ 	j endD
+anio:
+	li $a0,1  #dia el unico q se modificara en showdate
+	li $a1,1 
+	addi $a2,$a2,1 
+ 	jal showDate
+	
+endD:	lw $ra,0($sp)
+	addi $sp,$sp,4
+	jr $ra	
+				
+
+#apartado de Generacion dia segun mes y anio(bisiesto) inicio	
+diasDelMes:
+	#$a0 si es leap =1
+	#$a1 numMes
+	li $t0,2
+	slti $t1,$a1,8
+	beq $t1,$0,semestre2
+	div $a1,$t0
+	mfhi $t3
+	beq $t3,$0,return
+par31:	addi $v0,$v0,31
+	jr $ra
+	
+semestre2:
+	div $a1,$t0
+	mfhi $t0
+	beq $t0,$0,par31
+	
+return:
+	beq $a1,2,febrero
+	addi $v0,$v0,30
+	jr $ra 
+febrero:
+	beq $a0,$0,endA 
+	addi $v0,$v0,29
+	jr $ra
+endA:
+	addi $v0,$v0,28
+	jr $ra
+		
+#generacion dia fin
+
+#apartado de generacion aleatoria inicio
+numAleatorio: 	
+		#recibe $a1
+		li $v0,42 #genera numero ramdom entre 0 a $a1
+		syscall
+		add $v0,$a0,$0
+		jr $ra
+		
+#generacion aleatoria fin
+			
+	
+is_leap_year:
+	li	$t0, 4
+	li	$t1, 100
+	li	$t2, 400
+	li	$v0, 0
+	divu	$a0, $t0
+	mfhi	$t3
+	bnez	$t3, end	# Not divisible by 4, not a leap year
+	
+	divu	$a0, $t1
+	mfhi	$t3
+	bnez	$t3, leap	# Not divisible by 100, leap year
+	
+	divu	$a0, $t2
+	mfhi	$t3
+	bnez	$t3, end	# Divisible by 100 but not 400, not a leap year
+	
+	# Divisible by 100 and 400, fall through
+leap:
+	li 	$v0, 1
+end:
+        jr $ra
+
+
+showDate:
+		add $t0,$a0,$0
+		
+		li $v0,4 #su fecha es:
+		add $a0,$s5,$0
+		syscall
+		
+		li $v0,1
+		add $a0,$t0,$0
+		syscall 
+		
+		li $v0,4 #/
+		la $a0,msg5
+		syscall
+		
+		li $v0,1
+		add $a0,$a1,$0
+		syscall
+		 
+		li $v0,4 #/
+		la $a0,msg5
+		syscall
+		
+		li $v0,1
+		add $a0,$a2,$0
+		syscall
+		jr $ra
+		
+exit:		li $v0,10 #fin program
+		syscall
+		 
